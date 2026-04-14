@@ -125,10 +125,13 @@ Now that you know the structure:
 2. Extract user content elements using `list(body)` — NOT `findall('w:p')` (which misses tables)
 3. Build new body: `template[0:replace_start] + cleaned_user_content + template[replace_end+1:]`
 4. Apply style mapping to every paragraph
-5. Clean direct formatting (see rules below)
-6. Rebuild document.xml, keeping template's namespace declarations
-7. Merge relationships (images + hyperlinks)
-8. Write output using template as ZIP base
+5. Rebuild body paragraphs with clean text runs where needed — do NOT default to reusing the first run's `rPr`
+6. Clean direct formatting (see rules below)
+7. Rebuild document.xml, keeping template's namespace declarations
+8. Merge relationships (images + hyperlinks)
+9. Write output using template as ZIP base
+
+**Critical replacement rule**: When copying new正文 into template example paragraphs, do NOT blindly reuse the first run's `rPr`. That run often belongs to sample text, table headers, or emphasis in the template and can leak unwanted bold/italic/color into the delivered document.
 
 ---
 
@@ -269,6 +272,15 @@ When using the template as a base document (C-2 strategy), the template's `style
 
 When copying content from source to template, apply these rules to EACH paragraph and run:
 
+Recommended paragraph rewrite algorithm for正文 replacement:
+1. Keep the paragraph's `<w:pPr>` and mapped `<w:pStyle>`
+2. Delete all existing text-bearing runs from the paragraph
+3. Create one fresh, clean `<w:r>` for the replacement text unless the content truly needs mixed inline emphasis
+4. Preserve only necessary character properties such as `<w:rFonts w:eastAsia="..."/>` and required `<w:lang>` attributes
+5. By default, remove direct appearance overrides: `<w:b>`, `<w:i>`, `<w:u>`, `<w:color>`, `<w:highlight>`, `<w:shd>`, `<w:sz>`, `<w:szCs>`
+
+Do NOT use the paragraph's first existing run as the default formatting source.
+
 **REMOVE from `<w:rPr>`:**
 - `<w:rFonts w:ascii="..." w:hAnsi="..."/>` — Latin font overrides (EXCEPT: keep `w:eastAsia`)
 - `<w:sz>`, `<w:szCs>` — font size (let style control)
@@ -282,6 +294,7 @@ When copying content from source to template, apply these rules to EACH paragrap
 **KEEP in `<w:rPr>`:**
 - `<w:rFonts w:eastAsia="宋体"/>` — CJK font declaration (MUST keep, or Chinese text renders wrong)
 - `<w:rFonts w:eastAsia="华文中宋"/>` — same reason
+- `<w:lang>` — keep required language metadata when present
 - Anything inside `<w:drawing>` — image references (handle separately via rId remapping)
 
 **REMOVE from `<w:pPr>`:**
@@ -301,6 +314,8 @@ When copying content from source to template, apply these rules to EACH paragrap
 Apply the same rPr/pPr cleanup to every paragraph inside every cell. Also:
 - Keep `<w:tcPr>` structural properties (column span, row span, width)
 - Remove `<w:tcPr><w:shd>` (cell shading — let table style control)
+- If the cell is a label/header column, you may keep the template's original formatting
+- If the cell is a value/description column, rewrite its text using a clean body-text run; do NOT inherit the first existing run's `rPr`
 
 ---
 
@@ -388,6 +403,15 @@ Fix each failure:
 2. **Margin mismatch**: Update `w:sectPr` margins to match template
 3. **Font mismatch**: Update `w:docDefaults` to match template font scheme
 4. **Heading hierarchy gap**: Insert intermediate heading levels or adjust existing levels
+
+### Additional Delivery Check: Bold Baseline
+
+For template-based replacement work, add a lightweight verification step before delivery:
+1. Count `<w:b>` occurrences in the template's正文 replacement zone and in summary-table value columns
+2. Count the same regions in the output document
+3. If the output count exceeds the template baseline unexpectedly, treat it as a formatting leak and do not deliver until reviewed
+
+This check is especially important for C-2 Base-Replace flows, where template sample paragraphs often contain emphasis formatting that should not flow into user content.
 
 Re-validate after every fix until gate-check passes.
 

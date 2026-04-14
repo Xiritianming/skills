@@ -107,9 +107,9 @@ When the search text is split across multiple runs (common when Word applies spe
 <w:r><w:rPr><w:b /></w:rPr><w:t>me}}</w:t></w:r>
 ```
 
-Strategy:
+Strategy for true in-place placeholder replacement:
 1. Concatenate text across runs to find the match
-2. Place the replacement text in the **first** run (preserving its `w:rPr`)
+2. Place the replacement text in the **first** run only if the replacement is meant to inherit the surrounding inline formatting
 3. Remove the text from subsequent runs (or remove the runs entirely if empty)
 
 ```xml
@@ -117,7 +117,20 @@ Strategy:
 <w:r><w:rPr><w:b /></w:rPr><w:t>Acme Corp</w:t></w:r>
 ```
 
-**Rule**: Always preserve the formatting of the first run in the match.
+**Rule**: Do NOT blindly preserve the formatting of the first run in the match. The first run may come from template sample text, a table header, or emphasis formatting that must not leak into new body content.
+
+### Whole-Paragraph / Body Replacement
+
+When replacing template example paragraphs, long-form body text, or table value/description content, do NOT reuse the original text runs.
+
+Recommended algorithm:
+1. Keep the paragraph's `<w:pPr>` / `<w:pStyle>`
+2. Delete all original text runs in the paragraph
+3. Create a fresh, clean `<w:r>`
+4. Keep only necessary character properties, typically `<w:rFonts w:eastAsia="..."/>` and required language properties such as `<w:lang>`
+5. Remove direct emphasis and appearance overrides by default: `<w:b>`, `<w:i>`, `<w:u>`, `<w:color>`, `<w:highlight>`, `<w:shd>`, `<w:sz>`, `<w:szCs>`
+
+Use first-run `rPr` reuse only for narrow cases where the user is clearly editing inline text that should keep the existing local formatting.
 
 ---
 
@@ -171,6 +184,12 @@ To modify a specific cell, locate it by row/column index:
 ```
 
 Replace the `w:t` content. Do NOT modify `w:tcPr` (cell properties) or `w:tblPr` (table properties).
+
+Formatting rule by cell role:
+- Label/header cells may keep the template's original run formatting if that formatting defines the table's visual structure.
+- Value/description cells must be written with a clean body-text run. Do NOT default to inheriting the first existing run's `rPr`.
+
+For value/description cells, use the same clean-run algorithm as whole-paragraph replacement: keep paragraph style, remove old text runs, create a fresh run, preserve only required East Asian font and language properties.
 
 ---
 
@@ -246,6 +265,12 @@ Deleting text with tracking:
 **Problem**: Adding new paragraphs without specifying a style causes them to inherit `Normal`, which may not match the surrounding context.
 
 **Fix**: When inserting paragraphs, copy the `w:pStyle` from an adjacent paragraph of the same type.
+
+### 4a. First-Run Formatting Leakage
+
+**Problem**: Replacing template sample body text by reusing the first run's `rPr` carries bold, italic, color, or highlight from the sample into the new正文.
+
+**Fix**: For body replacement and table value cells, preserve paragraph-level styling only. Recreate the text with a clean run and keep only required `w:rFonts/@w:eastAsia` and language properties.
 
 ### 5. Numbering Continuity
 
