@@ -200,9 +200,9 @@ These prevent file corruption — OpenXML is strict about element ordering.
 | `w:tc` | `tcPr` → `p` (min 1 `<w:p/>`) |
 | `w:body` | block content → `sectPr` (LAST child) |
 
-**Direct format contamination:** When copying content from a source document, inline `rPr` (fonts, color) and `pPr` (borders, shading, spacing) override template styles. Do NOT default to reusing the first run's `rPr` when replacing template正文; that first run may be sample text, a header cell, or emphasized text. For正文/value-cell replacement, keep paragraph `pPr`/`pStyle`, delete original text runs, create a clean new run, keep only required `w:rFonts/@w:eastAsia` and language properties, and remove direct overrides such as `w:b`, `w:i`, `w:u`, `w:color`, `w:highlight`, `w:shd`, `w:sz`, `w:szCs`. Clean tables too (including `pPr/rPr` inside cells).
+**Direct format contamination:** When copying content from a source document, inline `rPr` (fonts, color) and `pPr` (borders, shading, spacing) override template styles. Do NOT default to reusing the first run's `rPr` when replacing template body content; that first run may be sample text, a header cell, or emphasized text. For plain-text body-content/value-cell replacement, keep paragraph `pPr`/`pStyle`, delete only the plain text runs being replaced, create a clean new run, keep only required `w:rFonts/@w:eastAsia` and language properties, and remove direct overrides such as `w:b`, `w:i`, `w:u`, `w:color`, `w:highlight`, `w:shd`, `w:sz`, `w:szCs`. If the paragraph or cell contains inline structures such as hyperlinks, bookmarks, field-code runs, `<w:br/>`, or `<w:tab/>`, preserve those structures and rebuild only the text-bearing runs inside them. Clean tables too (including `pPr/rPr` inside cells).
 
-**Table cell rule:** Label/header cells may keep template formatting. Value/description cells must use clean body-text runs, not inherited first-run formatting.
+**Table cell rule:** Label/header cells may keep template formatting. Plain-text value/description cells must use clean body-text runs, not inherited first-run formatting. If inline structures are present, preserve them and only rewrite the text-bearing runs.
 
 **Track changes:** `<w:del>` uses `<w:delText>`, never `<w:t>`. `<w:ins>` uses `<w:t>`, never `<w:delText>`.
 
@@ -225,7 +225,7 @@ These prevent file corruption — OpenXML is strict about element ordering.
 - Non-cover sections MUST have header/footer XML files (at least empty header + page number footer).
 - See `references/scenario_c_apply_template.md` section "Multi-Section Header/Footer Transfer".
 
-**Delivery gate for formatting leakage:** For template-based replacement, compare the template baseline vs output by counting `<w:b>` in the正文 replacement zone and in summary-table value columns. If the output exceeds the baseline unexpectedly, treat it as a likely formatting leak and do NOT deliver until reviewed.
+**Delivery gate for formatting leakage:** For template-based replacement, compare the template baseline vs output by counting `<w:b>` in the body-content replacement zone and in summary-table value columns. If the output exceeds the baseline unexpectedly, treat it as a likely formatting-leak warning and review the affected regions before delivery. This is a review signal, not a proof of correctness.
 
 ## References
 

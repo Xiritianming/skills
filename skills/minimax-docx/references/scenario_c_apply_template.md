@@ -125,13 +125,13 @@ Now that you know the structure:
 2. Extract user content elements using `list(body)` — NOT `findall('w:p')` (which misses tables)
 3. Build new body: `template[0:replace_start] + cleaned_user_content + template[replace_end+1:]`
 4. Apply style mapping to every paragraph
-5. Rebuild body paragraphs with clean text runs where needed — do NOT default to reusing the first run's `rPr`
+5. Rebuild plain-text body paragraphs with clean text runs where needed — do NOT default to reusing the first run's `rPr`
 6. Clean direct formatting (see rules below)
 7. Rebuild document.xml, keeping template's namespace declarations
 8. Merge relationships (images + hyperlinks)
 9. Write output using template as ZIP base
 
-**Critical replacement rule**: When copying new正文 into template example paragraphs, do NOT blindly reuse the first run's `rPr`. That run often belongs to sample text, table headers, or emphasis in the template and can leak unwanted bold/italic/color into the delivered document.
+**Critical replacement rule**: When copying new body content into template example paragraphs, do NOT blindly reuse the first run's `rPr`. That run often belongs to sample text, table headers, or emphasis in the template and can leak unwanted bold/italic/color into the delivered document. This clean-run rewrite is for plain-text paragraphs only; if a paragraph contains inline structures such as hyperlinks, field-code runs, bookmarks, `<w:br/>`, or `<w:tab/>`, preserve those structures and rebuild text inside them instead of flattening the whole paragraph.
 
 ---
 
@@ -272,14 +272,16 @@ When using the template as a base document (C-2 strategy), the template's `style
 
 When copying content from source to template, apply these rules to EACH paragraph and run:
 
-Recommended paragraph rewrite algorithm for正文 replacement:
+Recommended paragraph rewrite algorithm for plain-text body-content replacement:
 1. Keep the paragraph's `<w:pPr>` and mapped `<w:pStyle>`
-2. Delete all existing text-bearing runs from the paragraph
+2. Delete only the plain text runs that are being replaced
 3. Create one fresh, clean `<w:r>` for the replacement text unless the content truly needs mixed inline emphasis
 4. Preserve only necessary character properties such as `<w:rFonts w:eastAsia="..."/>` and required `<w:lang>` attributes
 5. By default, remove direct appearance overrides: `<w:b>`, `<w:i>`, `<w:u>`, `<w:color>`, `<w:highlight>`, `<w:shd>`, `<w:sz>`, `<w:szCs>`
 
 Do NOT use the paragraph's first existing run as the default formatting source.
+
+If the paragraph contains inline structures such as `<w:hyperlink>`, field-code runs, bookmark boundaries, `<w:br/>`, or `<w:tab/>`, preserve those containers and rewrite only the text-bearing runs inside the existing structure.
 
 **REMOVE from `<w:rPr>`:**
 - `<w:rFonts w:ascii="..." w:hAnsi="..."/>` — Latin font overrides (EXCEPT: keep `w:eastAsia`)
@@ -315,7 +317,8 @@ Apply the same rPr/pPr cleanup to every paragraph inside every cell. Also:
 - Keep `<w:tcPr>` structural properties (column span, row span, width)
 - Remove `<w:tcPr><w:shd>` (cell shading — let table style control)
 - If the cell is a label/header column, you may keep the template's original formatting
-- If the cell is a value/description column, rewrite its text using a clean body-text run; do NOT inherit the first existing run's `rPr`
+- If the cell is a value/description column with plain text, rewrite its text using a clean body-text run; do NOT inherit the first existing run's `rPr`
+- If the value/description cell contains hyperlinks, bookmarks, field-code runs, or explicit break/tab runs, preserve those inline structures and rebuild only the text-bearing runs inside them
 
 ---
 
@@ -407,11 +410,11 @@ Fix each failure:
 ### Additional Delivery Check: Bold Baseline
 
 For template-based replacement work, add a lightweight verification step before delivery:
-1. Count `<w:b>` occurrences in the template's正文 replacement zone and in summary-table value columns
+1. Count `<w:b>` occurrences in the template's body-content replacement zone and in summary-table value columns
 2. Count the same regions in the output document
-3. If the output count exceeds the template baseline unexpectedly, treat it as a formatting leak and do not deliver until reviewed
+3. If the output count exceeds the template baseline unexpectedly, raise a formatting-leak warning and review the affected regions before delivery
 
-This check is especially important for C-2 Base-Replace flows, where template sample paragraphs often contain emphasis formatting that should not flow into user content.
+This check is especially important for C-2 Base-Replace flows, where template sample paragraphs often contain emphasis formatting that should not flow into user content. It is a review signal, not a proof of correctness.
 
 Re-validate after every fix until gate-check passes.
 

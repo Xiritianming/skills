@@ -121,12 +121,14 @@ Strategy for true in-place placeholder replacement:
 
 ### Whole-Paragraph / Body Replacement
 
-When replacing template example paragraphs, long-form body text, or table value/description content, do NOT reuse the original text runs.
+When replacing template example paragraphs, long-form plain body text, or plain-text table value/description content, do NOT reuse the original text runs.
+
+Only use this cleanup when the target paragraph/cell is plain text. If the paragraph contains inline structures such as `<w:hyperlink>`, field-code runs, bookmark boundaries, `<w:br/>`, or `<w:tab/>`, preserve those containers and rebuild text inside them instead of flattening the entire paragraph into one new run.
 
 Recommended algorithm:
 1. Keep the paragraph's `<w:pPr>` / `<w:pStyle>`
-2. Delete all original text runs in the paragraph
-3. Create a fresh, clean `<w:r>`
+2. Delete only the original plain text runs that are being replaced
+3. Create a fresh, clean `<w:r>` for the replacement text
 4. Keep only necessary character properties, typically `<w:rFonts w:eastAsia="..."/>` and required language properties such as `<w:lang>`
 5. Remove direct emphasis and appearance overrides by default: `<w:b>`, `<w:i>`, `<w:u>`, `<w:color>`, `<w:highlight>`, `<w:shd>`, `<w:sz>`, `<w:szCs>`
 
@@ -189,7 +191,7 @@ Formatting rule by cell role:
 - Label/header cells may keep the template's original run formatting if that formatting defines the table's visual structure.
 - Value/description cells must be written with a clean body-text run. Do NOT default to inheriting the first existing run's `rPr`.
 
-For value/description cells, use the same clean-run algorithm as whole-paragraph replacement: keep paragraph style, remove old text runs, create a fresh run, preserve only required East Asian font and language properties.
+For value/description cells, use the same clean-run algorithm only when the cell content is plain text: keep paragraph style, remove only the replaced plain text runs, create a fresh run, and preserve only required East Asian font and language properties. Preserve hyperlinks, bookmarks, field-code runs, and explicit break/tab runs when present.
 
 ---
 
@@ -268,9 +270,9 @@ Deleting text with tracking:
 
 ### 4a. First-Run Formatting Leakage
 
-**Problem**: Replacing template sample body text by reusing the first run's `rPr` carries bold, italic, color, or highlight from the sample into the new正文.
+**Problem**: Replacing template sample body text by reusing the first run's `rPr` carries bold, italic, color, or highlight from the sample into the new body content.
 
-**Fix**: For body replacement and table value cells, preserve paragraph-level styling only. Recreate the text with a clean run and keep only required `w:rFonts/@w:eastAsia` and language properties.
+**Fix**: For plain-text body replacement and plain-text table value cells, preserve paragraph-level styling only. Recreate the text with a clean run and keep only required `w:rFonts/@w:eastAsia` and language properties. If inline structures are present, preserve them and only rebuild the text-bearing runs inside the existing structure.
 
 ### 5. Numbering Continuity
 
